@@ -1,0 +1,57 @@
+name: Extract ZIP and Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ambil repositori
+        uses: actions/checkout@v4
+
+      - name: Siapkan Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Ekstrak ZIP proyek
+        run: |
+          mkdir -p extracted
+          ZIP=$(find . -maxdepth 1 -type f -iname '*.zip' | head -n 1)
+          if [ -z "$ZIP" ]; then
+            echo "File ZIP tidak ditemukan!"
+            exit 1
+          fi
+          unzip -o "$ZIP" -d extracted
+          echo "Isi ZIP berhasil diekstrak."
+
+      - name: Cari proyek Android
+        run: |
+          GRADLEW=$(find extracted -type f -name gradlew | head -n 1)
+          if [ -z "$GRADLEW" ]; then
+            echo "File gradlew tidak ditemukan dalam ZIP."
+            echo "Periksa isi ZIP proyek Android."
+            exit 1
+          fi
+          echo "PROJECT_DIR=$(dirname "$GRADLEW")" >> "$GITHUB_ENV"
+
+      - name: Bangun APK
+        run: |
+          cd "$PROJECT_DIR"
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Simpan APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: IKYY-Live-Notes-APK
+          path: |
+            extracted/**/build/outputs/apk/debug/*.apk
+            extracted/**/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
